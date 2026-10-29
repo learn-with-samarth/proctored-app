@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proctored Examination Portal</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        margin: 0; background: #f8f9fa;
+        display: flex; flex-direction: column;
+    }
+    #setup-bar {
+        background: #fff; padding: 10px 20px; border-bottom: 1px solid #dadce0;
+        display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    }
+    #setup-bar input {
+        padding: 8px 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 14px;
+    }
+    #student-id-input { width: 180px; }
+    #form-url-input { flex: 1; min-width: 240px; }
+    #form-url-input[readonly] { background: #f1f3f4; color: #5f6368; }
+    #setup-error { width: 100%; color: #d93025; font-size: 13px; min-height: 0; }
+    #setup-error:empty { display: none; }
+    #header {
+        background: #1a73e8; color: #fff; padding: 10px 20px;
+        font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    }
+    #container { display: flex; flex: 1; min-height: 0; gap: 12px; padding: 12px; }
+    #form-frame { flex: 1; border: 1px solid #dadce0; border-radius: 8px; background: #fff; height: 100%; }
+    #proctor-sidebar {
+        width: 250px; background: #fff; border: 1px solid #dadce0; border-radius: 8px;
+        padding: 12px; display: flex; flex-direction: column; align-items: center;
+    }
+    #proctor-sidebar h4 { margin: 0 0 10px; font-size: 14px; color: #3c4043; }
+    video { width: 100%; height: 150px; background: #000; border-radius: 6px; object-fit: cover; }
+    .stat-box {
+        width: 100%; background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 6px;
+        padding: 10px; margin-top: 12px; text-align: center;
+    }
+    .stat-label { font-size: 11px; color: #5f6368; text-transform: uppercase; font-weight: 600; }
+    .warning { color: #d93025; font-size: 22px; font-weight: bold; margin-top: 4px; }
+    #status { color: #137333; font-weight: 600; font-size: 13px; margin-top: 4px; }
+    #status.bad { color: #c5221f; }
+    .btn {
+        background: #1a73e8; color: #fff; border: none; padding: 9px 18px;
+        border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px;
+    }
+    .btn:hover { background: #1557b0; }
+    .btn:disabled { background: #9aa0a6; cursor: not-allowed; }
+    #form-frame { min-width: 0; }
+    #rules { flex: 1; overflow: auto; background: #fff; border: 1px solid #dadce0; border-radius: 8px; padding: 16px 24px; line-height: 1.55; color: #3c4043; }
+    #rules h3 { margin-top: 0; }
+    #rules li { margin-bottom: 6px; }
+    #agree-label { font-size: 13px; color: #3c4043; display: flex; gap: 6px; align-items: center; }
+    @media (max-width: 700px) {
+        #container { flex-direction: column; overflow: auto; }
+        #proctor-sidebar { width: 100%; }
+        #form-frame { width: 100%; min-height: 70vh; flex: none; }
+    }
+    .overlay {
+        position: fixed; inset: 0; z-index: 1000; display: none;
+        align-items: center; justify-content: center; text-align: center; padding: 20px;
+    }
+    .overlay.show { display: flex; }
+    #modal { background: rgba(32,33,36,.75); }
+    #modal .card { background: #fff; border-radius: 8px; padding: 24px 28px; max-width: 460px; }
+    #modal h2 { margin: 0 0 8px; color: #b06000; }
+    #modal p { color: #3c4043; line-height: 1.5; margin: 0 0 16px; }
+    #terminated { background: #fce8e6; color: #c5221f; flex-direction: column; }
+    #terminated h1 { font-size: 32px; margin: 0 0 8px; }
+    #terminated p { font-size: 16px; color: #3c4043; max-width: 520px; line-height: 1.5; }
+    #terminated .tag {
+        margin-top: 20px; padding: 12px 24px; background: #c5221f; color: #fff;
+        border-radius: 4px; font-weight: bold; letter-spacing: .5px;
+    }
+</style>
+</head>
+<body>
+
+<div id="setup-bar">
+    <input type="text" id="student-id-input" placeholder="Student ID" autocomplete="off" />
+    <input type="text" id="form-url-input" placeholder="Paste Google Form URL here..." autocomplete="off" />
+    <label id="agree-label"><input type="checkbox" id="agree"> I have read and accept the exam rules</label>
+    <button class="btn" id="start-btn">Start Exam</button>
+    <div id="setup-error" role="alert"></div>
+</div>
+
+<div id="header">Proctored Examination Portal</div>
+
+<div id="container">
+    <div id="rules">
+        <h3>Read before you start</h3>
+        <ul>
+            <li>Use <b>Google Chrome or Edge on a laptop/PC</b>. Phones and tablets are not supported.</li>
+            <li>Close every other app, browser tab and window. Turn off notifications and screen savers. Plug in your charger.</li>
+            <li>Sit in a well-lit room, face the camera, and stay alone. Keep your face visible for the whole exam.</li>
+            <li>Click <b>Allow</b> for camera and full screen when asked. The exam will not start without both.</li>
+            <li>Do <b>not</b> switch tabs or windows, press Esc, minimise the browser, or unplug the camera.</li>
+            <li>You get <b>one warning</b>. The next violation ends your exam immediately and it cannot be restarted.</li>
+            <li>Do not refresh or close the page. If something breaks, tell your teacher; do not retry on your own.</li>
+            <li>Copy, paste and right-click are disabled. Webcam photos and activity are recorded for review.</li>
+        </ul>
+    </div>
+    <iframe id="form-frame" title="Exam form" allow="autoplay" hidden></iframe>
+    <div id="proctor-sidebar">
+        <h4>Webcam Feed</h4>
+        <video id="webcam" autoplay playsinline muted></video>
+        <div class="stat-box">
+            <span class="stat-label">Warnings</span>
+            <div id="violations" class="warning">0 / 1</div>
+        </div>
+        <div class="stat-box">
+            <span class="stat-label">Status</span>
+            <div id="status">Not started</div>
+        </div>
+    </div>
+</div>
+
+<div id="modal" class="overlay" role="alertdialog" aria-modal="true">
+    <div class="card">
+        <h2>Warning</h2>
+        <p id="modal-text"></p>
+        <button class="btn" id="modal-btn">Return to exam</button>
+    </div>
+</div>
+
+<div id="terminated" class="overlay" role="alert">
+    <h1>EXAM TERMINATED</h1>
+    <p id="terminated-text"></p>
+    <div class="tag">Session Closed</div>
+</div>
+
+<script>
+(() => {
+    'use strict';
+
+    // ------------------------------------------------------------------
+    // Configuration. To override, define window.PROCTOR_CONFIG in an earlier script block, e.g.
+    //   window.PROCTOR_CONFIG = { LOG_ENDPOINT: 'https://script.google.com/macros/s/XXXX/exec' };
+    // ------------------------------------------------------------------
+    const CONFIG = Object.assign({
+        MAX_WARNINGS: 1,                 // warnings allowed; the next violation terminates
+        REQUIRE_FULLSCREEN: true,        // ask for full screen and treat exiting it as a violation
+        LOG_ENDPOINT: 'https://forms.gle/biFYZDJGVB6myaQv8',                // PASTE your Google Apps Script web-app URL here (empty = no server record)
+        SNAPSHOT_INTERVAL_MS: 60000,     // webcam snapshot interval; 0 disables; needs LOG_ENDPOINT
+        ALLOWED_HOSTS: ['docs.google.com', 'forms.gle']
+    }, window.PROCTOR_CONFIG || {});
+
+    const REASONS = {
+        tab_hidden:      'You switched to another tab or minimized the browser.',
+        window_blur:     'You switched to another window or application.',
+        fullscreen_exit: 'You exited full-screen mode.'
+    };
+
+    const $ = id => document.getElementById(id);
+    const state = {
+        starting: false, started: false, terminated: false, away: false,
+        count: 0, fsEntered: false, stream: null, snapTimer: null,
+        studentId: '', formUrl: '', examKey: '', storeKey: ''
+    };
+    const eventLog = [];
+
+    // ---------------- Logging ----------------
+    function log(type, detail) {
+        const entry = Object.assign(
+            { type, studentId: state.studentId, formUrl: state.formUrl, examKey: state.examKey, time: new Date().toISOString() },
+            detail || {}
+        );
+        eventLog.push(entry);
+        if (CONFIG.LOG_ENDPOINT) {
+            try {
+                fetch(CONFIG.LOG_ENDPOINT, {
+                    method: 'POST', mode: 'no-cors', keepalive: true,
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(entry)
+                }).catch(() => {});
+            } catch (e) { /* logging must never break the exam */ }
+        }
+    }
+
+    // ---------------- Persistence (survives reloads) ----------------
+    function storeGet(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
+    function storeSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+    function persist() { storeSet(state.storeKey, { count: state.count, terminated: state.terminated }); }
+
+    // ---------------- URL validation ----------------
+    function normalizeFormUrl(raw) {
+        let s = (raw || '').trim();
+        if (!s) return { error: 'Please enter the Google Form link.' };
+        if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = 'https://' + s;   // allow links pasted without https://
+        let u;
+        try { u = new URL(s); } catch (e) { return { error: 'That is not a valid link.' }; }
+        if (u.protocol !== 'https:') return { error: 'Only https:// links are allowed.' };
+        if (!CONFIG.ALLOWED_HOSTS.includes(u.hostname)) return { error: 'Only Google Forms links are allowed.' };
+        if (u.hostname === 'docs.google.com' && !u.pathname.startsWith('/forms/')) {
+            return { error: 'Only Google Forms links are allowed.' };
+        }
+        if (u.pathname.endsWith('/viewform')) u.searchParams.set('embedded', 'true');  // safe with ?query and #hash
+        return { url: u.toString() };
+    }
+
+    // ---------------- UI helpers ----------------
+    function showSetupError(msg) { $('setup-error').textContent = msg || ''; }
+    function updateUI() {
+        $('violations').textContent = state.count + ' / ' + CONFIG.MAX_WARNINGS;
+        const st = $('status');
+        st.textContent = state.terminated ? 'Terminated' : state.started ? 'Active Monitoring' : 'Not started';
+        st.className = state.terminated ? 'bad' : '';
+    }
+    function showWarning(kind) {
+        $('modal-text').textContent = REASONS[kind] + ' This is warning ' + state.count + ' of ' +
+            CONFIG.MAX_WARNINGS + '. Another violation will end your exam.';
+        $('modal').classList.add('show');
+    }
+    function hideWarning() { $('modal').classList.remove('show'); }
+
+    // ---------------- Camera & fullscreen ----------------
+    async function getCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Camera is not available. Open this page over https:// in a current browser.');
+        }
+        try {
+            return await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch (e) {
+            throw new Error('Camera access was denied. Allow camera access and press Start again.');
+        }
+    }
+    function stopCamera() {
+        if (state.stream) { state.stream.getTracks().forEach(t => t.stop()); state.stream = null; }
+        clearInterval(state.snapTimer);
+    }
+    async function enterFullscreen() {
+        const el = document.documentElement;
+        if (!CONFIG.REQUIRE_FULLSCREEN || !el.requestFullscreen) return;
+        try { await el.requestFullscreen(); } catch (e) { log('fullscreen_denied'); }
+        state.fsEntered = !!document.fullscreenElement;
+    }
+    function startSnapshots() {
+        if (!CONFIG.LOG_ENDPOINT || !CONFIG.SNAPSHOT_INTERVAL_MS) return;
+        state.snapTimer = setInterval(() => {
+            try {
+                const v = $('webcam');
+                if (!v.videoWidth) return;
+                const c = document.createElement('canvas');
+                c.width = 320; c.height = Math.round(320 * v.videoHeight / v.videoWidth);
+                c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+                log('snapshot', { image: c.toDataURL('image/jpeg', 0.5) });
+            } catch (e) {}
+        }, CONFIG.SNAPSHOT_INTERVAL_MS);
+    }
+
+    // ---------------- Server-side record (cannot be bypassed by clearing the browser) ----------------
+    async function remoteStatus() {
+        if (!CONFIG.LOG_ENDPOINT) return {};
+        const r = await fetch(CONFIG.LOG_ENDPOINT + '?action=status&key=' + encodeURIComponent(state.storeKey));
+        return await r.json();
+    }
+
+    // ---------------- Start ----------------
+    async function start() {
+        if (state.started || state.starting || state.terminated) return;
+        showSetupError('');
+        const id = $('student-id-input').value.trim();
+        if (!id) return showSetupError('Please enter your student ID.');
+        if (!$('agree').checked) return showSetupError('Please tick the box to accept the exam rules.');
+        const parsed = normalizeFormUrl($('form-url-input').value);
+        if (parsed.error) return showSetupError(parsed.error);
+
+        state.starting = true;
+        $('start-btn').disabled = true;
+        state.studentId = id;
+        state.formUrl = parsed.url;
+        const ku = new URL(parsed.url);
+        state.examKey = ku.origin + ku.pathname;      // ignores ?query and #hash, so they cannot be used to reset
+        state.storeKey = 'proctor:' + id.toLowerCase() + '|' + state.examKey;
+
+        let saved = storeGet(state.storeKey);
+        try {
+            const remote = await remoteStatus();
+            if (remote.terminated || remote.count) {
+                saved = { count: Math.max(remote.count || 0, (saved && saved.count) || 0),
+                          terminated: !!remote.terminated || !!(saved && saved.terminated) };
+            }
+        } catch (e) {
+            state.starting = false; $('start-btn').disabled = false;
+            return showSetupError('Could not reach the exam server. Check your internet and press Start again.');
+        }
+        if (saved) {
+            state.count = saved.count || 0;
+            if (saved.terminated) {
+                state.terminated = true;
+                log('restart_blocked');
+                updateUI();
+                $('setup-bar').style.display = 'none';
+                showTerminated('This exam was already terminated for this student ID.');
+                return;
+            }
+        }
+
+        await enterFullscreen();     // first, while the click is still a fresh user gesture
+        if (CONFIG.REQUIRE_FULLSCREEN && document.documentElement.requestFullscreen && !state.fsEntered) {
+            state.starting = false; $('start-btn').disabled = false;
+            return showSetupError('Full screen is required. Allow it and press Start again.');
+        }
+        let stream;
+        try {
+            stream = await getCamera();
+        } catch (e) {
+            try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {}
+            log('camera_unavailable', { message: e.message });
+            state.starting = false;
+            $('start-btn').disabled = false;
+            return showSetupError(e.message);
+        }
+
+        state.stream = stream;
+        $('webcam').srcObject = stream;
+        stream.getTracks().forEach(t => t.addEventListener('ended', () => {
+            if (state.started && !state.terminated) terminate('Your camera was disconnected.', 'camera_lost');
+        }));
+        state.started = true;
+        state.starting = false;
+        state.away = false;
+        $('setup-bar').style.display = 'none';
+        $('rules').style.display = 'none';
+        $('form-frame').hidden = false;
+        $('form-frame').src = parsed.url;        // the exam loads only after camera + full screen are live
+        updateUI();
+        log('start');
+        startSnapshots();
+    }
+
+    // ---------------- Violations ----------------
+    // One "away episode" counts once, however many signals it triggers
+    // (hidden tab + blur + fullscreen exit all fire together on Alt-Tab).
+    function violation(kind) {
+        if (!state.started || state.terminated || state.away) return;
+        state.away = true;
+        state.count++;
+        persist();
+        updateUI();
+        log('violation', { kind, count: state.count });
+        if (state.count > CONFIG.MAX_WARNINGS) terminate(REASONS[kind], 'violation_limit');
+        else showWarning(kind);
+    }
+    function checkReturned() {
+        if (!state.started || state.terminated) return;
+        const visible = !document.hidden;
+        const focused = document.hasFocus();
+        const fsOk = !state.fsEntered || !!document.fullscreenElement;
+        if (visible && focused && fsOk) state.away = false;
+    }
+
+    function terminate(reason, code) {
+        if (state.terminated) return;
+        state.terminated = true;
+        persist();
+        log('terminated', { code, reason });
+        stopCamera();
+        $('form-frame').src = 'about:blank';
+        hideWarning();
+        try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+        updateUI();
+        showTerminated(reason + ' Your exam has been terminated.');
+    }
+    function showTerminated(text) {
+        $('terminated-text').textContent = text;       // textContent: never interpreted as HTML
+        $('terminated').classList.add('show');
+    }
+
+    // ---------------- Event wiring ----------------
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) violation('tab_hidden'); else checkReturned();
+    });
+    window.addEventListener('blur', () => {
+        // Clicking inside the Google Form iframe also blurs the parent window; that is not a violation.
+        setTimeout(() => {
+            if (document.hasFocus()) return;   // true while focus is inside the form iframe too
+            violation('window_blur');
+        }, 50);
+    });
+    window.addEventListener('focus', checkReturned);
+    document.addEventListener('fullscreenchange', () => {
+        if (!state.started || state.terminated) return;
+        if (state.fsEntered && !document.fullscreenElement) violation('fullscreen_exit');
+        else checkReturned();
+    });
+    window.addEventListener('pagehide', () => { if (state.started && !state.terminated) log('page_hide'); });
+    window.addEventListener('beforeunload', e => {
+        if (state.started && !state.terminated) { e.preventDefault(); e.returnValue = ''; }
+    });
+    ['contextmenu', 'copy', 'cut', 'paste'].forEach(type => {
+        document.addEventListener(type, e => {
+            if (!state.started || state.terminated) return;
+            e.preventDefault();
+            log('blocked_action', { action: type });
+        });
+    });
+
+    $('modal-btn').addEventListener('click', async () => {
+        hideWarning();
+        if (state.fsEntered && !document.fullscreenElement) await enterFullscreen();  // click = user gesture
+        state.away = false;
+    });
+    $('start-btn').addEventListener('click', start);
+
+    // ---------------- Preset ?form= (prefilled and locked, still needs a click to start) ----------------
+    window.addEventListener('DOMContentLoaded', () => {
+        const preset = new URLSearchParams(window.location.search).get('form');
+        if (!preset) return;
+        const parsed = normalizeFormUrl(preset);
+        if (parsed.error) return showSetupError('The preset link was rejected: ' + parsed.error);
+        $('form-url-input').value = parsed.url;
+        $('form-url-input').readOnly = true;
+    });
+
+    // Read-only handle for testing/diagnostics
+    window.ProctorPortal = { getLog: () => eventLog.slice(), getState: () => Object.assign({}, state, { stream: !!state.stream }) };
+    updateUI();
+})();
+</script>
+</body>
+</html>
